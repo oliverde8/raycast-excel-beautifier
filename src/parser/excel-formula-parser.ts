@@ -160,17 +160,17 @@ export class ExcelFormulaBeautifier {
 
   private static prettyPrint(expression: ExcelExpression, depth: number): string {
     const children = expression.getChilds();
-    
-    // If no children, return the original content
+
+    // If no children, return the original content with operator spacing
     if (children.length === 0) {
-      return expression.original || "";
+      return this.addOperatorSpacing(expression.original || "");
     }
 
     let result = "";
-    
+
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
-      
+  
       if (child instanceof FormulaExpr) {
         result += this.formatFunction(child, depth);
       } else if (child instanceof SubExpression) {
@@ -178,12 +178,12 @@ export class ExcelFormulaBeautifier {
       } else {
         // For regular expressions, check if they have children or use original
         if (child.getChilds().length === 0) {
-          result += child.original || "";
+          result += this.addOperatorSpacing(child.original || "");
         } else {
           result += this.prettyPrint(child, depth);
         }
       }
-      
+  
       // Add spacing between elements if needed
       if (i < children.length - 1) {
         const nextChild = children[i + 1];
@@ -192,7 +192,7 @@ export class ExcelFormulaBeautifier {
         }
       }
     }
-    
+
     return result;
   }
 
@@ -208,18 +208,18 @@ export class ExcelFormulaBeautifier {
       for (let i = 0; i < params.length; i++) {
         const param = params[i];
         const isLast = i === params.length - 1;
-        
+    
         if (param instanceof FormulaExpr && this.shouldFormatInline(param)) {
-          result += this.formatFunction(param, depth);
+          result += this.formatFunction(param, depth + 1);
         } else if (param instanceof SubExpression) {
           result += this.formatSubExpression(param, depth);
         } else {
           const paramContent = param.getChilds().length === 0 
-            ? param.original 
+            ? this.addOperatorSpacing(param.original || "")
             : this.prettyPrint(param, depth);
           result += paramContent || "";
         }
-        
+    
         if (!isLast) {
           result += "; ";
         }
@@ -230,38 +230,43 @@ export class ExcelFormulaBeautifier {
 
     // Multi-line formatting for complex functions
     let result = func.formula + "(\n";
-    
+
     for (let i = 0; i < params.length; i++) {
       const param = params[i];
       const isLast = i === params.length - 1;
-      
+  
+      // Add indentation and nesting indicator for parameters
       result += this.indent(depth + 1);
-      
+      result += this.getNestingIndicator(depth + 1, isLast);
+  
       if (param instanceof FormulaExpr) {
-        result += this.formatFunction(param, depth + 1);
+        // For nested functions, don't add extra indicator since formatFunction will handle it
+        const functionResult = this.formatFunction(param, depth + 1);
+        result += functionResult;
       } else if (param instanceof SubExpression) {
-        result += this.formatSubExpression(param, depth + 1);
+        const subResult = this.formatSubExpression(param, depth + 1);
+        result += subResult;
       } else {
         // For parameter content, preserve original or format children
         const paramContent = param.getChilds().length === 0 
-          ? param.original 
+          ? this.addOperatorSpacing(param.original || "")
           : this.prettyPrint(param, depth + 1);
         result += paramContent || "";
       }
-      
+  
       if (!isLast) {
         result += ";";
       }
       result += "\n";
     }
-    
+
     result += this.indent(depth) + ")";
     return result;
   }
 
   private static shouldFormatInline(func: FormulaExpr): boolean {
     const params = func.getChilds();
-    
+
     // No parameters or only one parameter
     if (params.length === 0 || params.length === 1) {
       // Check if the single parameter is simple
@@ -281,7 +286,7 @@ export class ExcelFormulaBeautifier {
       }
       return true;
     }
-    
+
     // Multiple parameters - only inline if all are very simple and short
     if (params.length <= 3) {
       let totalLength = 0;
@@ -297,20 +302,22 @@ export class ExcelFormulaBeautifier {
       }
       return totalLength <= 40;
     }
-    
+
     return false;
   }
 
   private static formatSubExpression(subExpr: SubExpression, depth: number): string {
-    const content = this.prettyPrint(subExpr, depth + 1);
-    
+    const content = this.prettyPrint(subExpr, depth);
+
     // If it's simple, keep on one line
     if (!content.includes('\n') && content.length < 50 && !this.containsFunction(subExpr)) {
       return "(" + content + ")";
     }
-    
+
     // Complex sub-expression gets multi-line formatting
-    return "(\n" + this.indent(depth + 1) + content + "\n" + this.indent(depth) + ")";
+    return "(\n" + 
+           this.indent(depth + 1) + content + "\n" + 
+           this.indent(depth) + ")";
   }
 
   private static containsFunction(expr: ExcelExpression): boolean {
@@ -323,15 +330,80 @@ export class ExcelFormulaBeautifier {
   private static needsSpacing(current: ExcelExpression, next: ExcelExpression): boolean {
     const currentText = current.original?.trim();
     const nextText = next.original?.trim();
-    
+
     if (!currentText || !nextText) return false;
-    
+
     const operators = ['+', '-', '*', '/', '=', '<', '>', '<=', '>=', '<>', '&'];
     return operators.includes(currentText) || operators.includes(nextText);
   }
 
   private static indent(depth: number): string {
     return "    ".repeat(depth);
+  }
+
+  private static getNestingIndicator(depth: number, isLast: boolean = false): string {
+    if (depth === 0) return "";
+
+    // Create a simple but consistent nesting indicator
+    const prefix = "  ".repeat(Math.max(0, depth - 1)); // 2 spaces per level
+
+    if (depth === 1) {
+      return isLast ? "└─ " : "├─ ";
+    } else {
+      return prefix + (isLast ? "└─ " : "├─ ");
+    }
+  }
+
+  private static addNestingIndicator(text: string, depth: number, isLast: boolean = false): string {
+    if (depth === 0) return text;
+    return this.getNestingIndicator(depth, isLast) + text;
+  }
+
+  private static addOperatorSpacing(text: string): string {
+    if (!text) return text;
+
+    // Add spacing around mathematical and comparison operators
+    let result = text;
+
+    // Define operators that need spacing
+    const operators = [
+      { op: '<=', replacement: ' <= ' },
+      { op: '>=', replacement: ' >= ' },
+      { op: '<>', replacement: ' <> ' },
+      { op: '!=', replacement: ' != ' },
+      { op: '==', replacement: ' == ' },
+      { op: '=', replacement: ' = ' },
+      { op: '<', replacement: ' < ' },
+      { op: '>', replacement: ' > ' },
+      { op: '+', replacement: ' + ' },
+      { op: '-', replacement: ' - ' },
+      { op: '*', replacement: ' * ' },
+      { op: '/', replacement: ' / ' },
+      { op: '&', replacement: ' & ' },
+    ];
+
+    for (const { op, replacement } of operators) {
+      // Use regex to avoid spacing already spaced operators and operators in strings
+      const regex = new RegExp(`(?<![\\s<>=!])\\${op.split('').join('\\')}(?![\\s<>=!])`, 'g');
+      result = result.replace(regex, replacement);
+    }
+
+    // Clean up multiple spaces
+    result = result.replace(/\s{2,}/g, ' ');
+
+    // Handle special cases - don't add space around operators in certain contexts
+
+    // Fix negative numbers (don't space before minus if it's at start or after operator/comma/parenthesis)
+    result = result.replace(/(^|[+\-*/=<>!&,(])\s*-\s*(\d)/g, '$1-$2');
+
+    // Fix cell ranges (A1:B10 should not have spaces around colon)
+    result = result.replace(/([A-Z]+\$?\d+)\s*:\s*([A-Z]+\$?\d+)/g, '$1:$2');
+
+    // Fix absolute references (don't space around $ in cell references)
+    result = result.replace(/\$\s*([A-Z]+)\s*\$?\s*(\d+)/g, '$$1$$2');
+    result = result.replace(/([A-Z]+)\s*\$\s*(\d+)/g, '$1$$2');
+
+    return result.trim();
   }
 
   static beautify(formula: string): BeautificationResult {
