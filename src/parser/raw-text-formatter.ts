@@ -5,6 +5,8 @@ import {
   SubExpression,
   FormulaExpr,
   OperatorExpression,
+  CellReferenceExpression,
+  CellRangeExpression,
   FormattingOptions,
   DEFAULT_FORMATTING_OPTIONS
 } from "./types";
@@ -40,6 +42,10 @@ export class ExcelRawTextFormatter {
         result += this.formatSubExpression(child, depth);
       } else if (child instanceof OperatorExpression) {
         result += this.formatOperator(child, i, children);
+      } else if (child instanceof CellReferenceExpression) {
+        result += this.formatCellReference(child);
+      } else if (child instanceof CellRangeExpression) {
+        result += this.formatCellRange(child);
       } else {
         // For regular expressions, check if they have children or use original
         if (child.getChilds().length === 0) {
@@ -107,7 +113,7 @@ export class ExcelRawTextFormatter {
         result += subResult;
       } else {
         // For parameter content, preserve original or format children
-        const paramContent = param.getChilds().length === 0 
+        const paramContent = param.getChilds().length === 0
           ? param.original || ""
           : this.prettyPrint(param, depth + 1);
         result += paramContent || "";
@@ -174,14 +180,14 @@ export class ExcelRawTextFormatter {
     }
 
     // Complex sub-expression gets multi-line formatting
-    return "(\n" + 
+    return "(\n" +
       this.indent(depth + 1) + content + "\n" +
       this.indent(depth) + ")";
   }
 
   private formatOperator(
-    operator: OperatorExpression, 
-    index: number, 
+    operator: OperatorExpression,
+    index: number,
     siblings: ExcelExpression[]
   ): string {
     if (!this.options.useOperatorSpacing) {
@@ -200,9 +206,9 @@ export class ExcelRawTextFormatter {
     if (shouldSpaceBefore) {
       result += " ";
     }
-    
+
     result += op;
-    
+
     if (shouldSpaceAfter) {
       result += " ";
     }
@@ -222,7 +228,7 @@ export class ExcelRawTextFormatter {
         }
       }
     }
-    
+
     // Don't space around colon in ranges (A1:B10)
     if (operator === ":") {
       return false;
@@ -240,6 +246,16 @@ export class ExcelRawTextFormatter {
     return true;
   }
 
+  private formatCellReference(cellRef: CellReferenceExpression): string {
+    // Use the built-in method to get properly formatted reference
+    return cellRef.getFullReference();
+  }
+
+  private formatCellRange(cellRange: CellRangeExpression): string {
+    // Use the built-in method to get properly formatted range
+    return cellRange.getFullReference();
+  }
+
   private containsFunction(expr: ExcelExpression): boolean {
     if (expr instanceof FormulaExpr) {
       return true;
@@ -248,12 +264,10 @@ export class ExcelRawTextFormatter {
   }
 
   private needsSpacing(current: ExcelExpression, next: ExcelExpression): boolean {
-    // Since operators are now handled separately as OperatorExpression,
-    // we mainly need spacing between functions and regular expressions
     if (current instanceof FormulaExpr || next instanceof FormulaExpr) {
       return false; // Functions handle their own spacing
     }
-    
+
     if (current instanceof OperatorExpression || next instanceof OperatorExpression) {
       return false; // Operators handle their own spacing
     }
@@ -278,6 +292,4 @@ export class ExcelRawTextFormatter {
       return prefix + (isLast ? "└─ " : "├─ ");
     }
   }
-
-
 }

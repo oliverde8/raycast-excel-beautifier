@@ -15,9 +15,15 @@
   "license": "MIT",
   "commands": [
     {
-      "name": "excel-beautifier",
-      "title": "Excel Beautifier",
-      "description": "Allows excel formula in clipboard to be beautified.",
+      "name": "excel-beautifier-clipboard",
+      "title": "Excel Beautifier from Clipboard",
+      "description": "Beautify Excel formula from clipboard content.",
+      "mode": "view"
+    },
+    {
+      "name": "excel-beautifier-form",
+      "title": "Excel Beautifier with Form Input",
+      "description": "Enter and beautify Excel formulas using a text input form.",
       "mode": "view"
     }
   ],
