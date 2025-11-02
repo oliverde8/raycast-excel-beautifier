@@ -34,11 +34,11 @@ export default function Command() {
         }
 
         try {
-          // Use our custom beautifier with the new parser
-          const result = ExcelFormulaBeautifier.beautify(trimmed);
+          // Use our custom formatter with the new parser
+          const beautified = ExcelFormulaBeautifier.rawText(trimmed);
           setFormulaData({
             original: trimmed,
-            beautified: result.beautified,
+            beautified: beautified,
           });
         } catch (formulaError) {
           // If beautification fails, show error with the original content
