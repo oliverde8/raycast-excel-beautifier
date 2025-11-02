@@ -16,9 +16,7 @@ export default function Command() {
 
     try {
       // Ensure formula starts with =
-      const formulaWithEquals = inputFormula.trim().startsWith('=') 
-        ? inputFormula.trim() 
-        : '=' + inputFormula.trim();
+      const formulaWithEquals = inputFormula.trim().startsWith("=") ? inputFormula.trim() : "=" + inputFormula.trim();
 
       // Use our custom formatter with the enhanced parser
       const beautified = ExcelFormulaBeautifier.rawText(formulaWithEquals);
@@ -59,11 +57,12 @@ export default function Command() {
       // Make parser errors more user-friendly
       let friendlyError = error;
       if (error.includes("Parse error")) {
-        friendlyError = "Invalid formula syntax - please check for missing parentheses, quotes, or incomplete expressions";
+        friendlyError =
+          "Invalid formula syntax - please check for missing parentheses, quotes, or incomplete expressions";
       }
       return `❌ ${friendlyError}`;
     }
-    
+
     if (!beautifiedFormula && !formula.trim()) {
       return `📝 Enter a formula above to see the beautified result.
 
@@ -84,11 +83,7 @@ Examples to try:
     <Form
       actions={
         <ActionPanel>
-          <Action
-            title="Clear"
-            onAction={handleClear}
-            shortcut={{ modifiers: ["cmd"], key: "l" }}
-          />
+          <Action title="Clear" onAction={handleClear} shortcut={{ modifiers: ["cmd"], key: "l" }} />
           {beautifiedFormula && (
             <Action.CopyToClipboard
               title="Copy Beautified Formula"
@@ -99,7 +94,7 @@ Examples to try:
           {formula && (
             <Action.CopyToClipboard
               title="Copy Original Formula"
-              content={formula.trim().startsWith('=') ? formula.trim() : '=' + formula.trim()}
+              content={formula.trim().startsWith("=") ? formula.trim() : "=" + formula.trim()}
               shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
             />
           )}
@@ -117,10 +112,7 @@ Examples to try:
 
       <Form.Separator />
 
-      <Form.Description
-        title=""
-        text={getStatusMessage()}
-      />
+      <Form.Description title="" text={getStatusMessage()} />
 
       {beautifiedFormula && (
         <Form.TextArea

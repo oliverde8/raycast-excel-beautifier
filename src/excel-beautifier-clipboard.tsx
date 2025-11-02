@@ -24,12 +24,12 @@ export default function Command() {
 
         // Check if it looks like an Excel formula
         const trimmed = clipboardContent.trim();
-        if (!trimmed.startsWith('=')) {
+        if (!trimmed.startsWith("=")) {
           // Try to beautify anyway, maybe user copied formula without =
           showToast({
             style: Toast.Style.Animated,
             title: "Warning",
-            message: "Content doesn't start with '='. Treating as formula anyway."
+            message: "Content doesn't start with '='. Treating as formula anyway.",
           });
         }
 
@@ -42,7 +42,9 @@ export default function Command() {
           });
         } catch (formulaError) {
           // If beautification fails, show error with the original content
-          setError(`Invalid Excel formula: ${formulaError instanceof Error ? formulaError.message : String(formulaError)}`);
+          setError(
+            `Invalid Excel formula: ${formulaError instanceof Error ? formulaError.message : String(formulaError)}`,
+          );
           setIsLoading(false);
           return;
         }

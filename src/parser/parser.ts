@@ -1,13 +1,13 @@
 // Excel Formula Parser - Pure parsing logic
 
 import { FormulaTypes } from "./formula-types";
-import { 
-  ExcelExpression, 
-  SubExpression, 
-  FormulaExpr, 
+import {
+  ExcelExpression,
+  SubExpression,
+  FormulaExpr,
   OperatorExpression,
   CellReferenceExpression,
-  CellRangeExpression
+  CellRangeExpression,
 } from "./types";
 
 export class ExcelFormulaParser {
@@ -15,8 +15,21 @@ export class ExcelFormulaParser {
 
   // Define operators in order of precedence (longest first to avoid partial matches)
   private static readonly operators: Array<string> = [
-    "<=", ">=", "<>", "!=", "==", // Comparison operators (2 chars)
-    "+", "-", "*", "/", "^", "&", "=", "<", ">", ":", // Single char operators
+    "<=",
+    ">=",
+    "<>",
+    "!=",
+    "==", // Comparison operators (2 chars)
+    "+",
+    "-",
+    "*",
+    "/",
+    "^",
+    "&",
+    "=",
+    "<",
+    ">",
+    ":", // Single char operators
   ];
 
   private static findOperatorAt(input: string, position: number): string | null {
@@ -42,7 +55,7 @@ export class ExcelFormulaParser {
     text = text.trim();
 
     // Check for range first (contains :)
-    if (text.includes(':')) {
+    if (text.includes(":")) {
       return this.parseCellRange(text);
     }
 
@@ -63,21 +76,21 @@ export class ExcelFormulaParser {
     const [, sheet, colAbsolute, column, rowAbsolute, row] = match;
 
     // Clean sheet name (remove quotes if present)
-    const cleanSheet = sheet ? sheet.replace(/^'|'$/g, '') : undefined;
+    const cleanSheet = sheet ? sheet.replace(/^'|'$/g, "") : undefined;
 
     return new CellReferenceExpression(
       text,
       cleanSheet,
       column.toUpperCase(),
       row,
-      colAbsolute === '$',
-      rowAbsolute === '$'
+      colAbsolute === "$",
+      rowAbsolute === "$",
     );
   }
 
   private static parseCellRange(text: string): CellRangeExpression | null {
     // Split on colon
-    const parts = text.split(':');
+    const parts = text.split(":");
     if (parts.length !== 2) {
       return null;
     }
@@ -88,9 +101,9 @@ export class ExcelFormulaParser {
     const end = endPart;
 
     // Check if sheet is specified in the start part
-    if (start.includes('!')) {
-      const sheetSplit = start.split('!');
-      sheet = sheetSplit[0].replace(/^'|'$/g, ''); // Remove quotes
+    if (start.includes("!")) {
+      const sheetSplit = start.split("!");
+      sheet = sheetSplit[0].replace(/^'|'$/g, ""); // Remove quotes
       start = sheetSplit[1];
     }
 
@@ -102,12 +115,7 @@ export class ExcelFormulaParser {
       return null;
     }
 
-    return new CellRangeExpression(
-      text,
-      sheet,
-      startCell,
-      endCell
-    );
+    return new CellRangeExpression(text, sheet, startCell, endCell);
   }
 
   private static combineCellRanges(parent: ExcelExpression): void {
@@ -120,11 +128,12 @@ export class ExcelFormulaParser {
       const afterNext = i + 2 < children.length ? children[i + 2] : null;
 
       // Check if we have: CellReference : CellReference pattern
-      if (current instanceof CellReferenceExpression &&
-          next instanceof OperatorExpression && 
-          next.operator === ':' &&
-          afterNext instanceof CellReferenceExpression) {
-
+      if (
+        current instanceof CellReferenceExpression &&
+        next instanceof OperatorExpression &&
+        next.operator === ":" &&
+        afterNext instanceof CellReferenceExpression
+      ) {
         // Create a range expression
         const sheet = current.sheet || afterNext.sheet;
         const rangeText = `${current.getFullReference()}:${afterNext.getFullReference()}`;
@@ -328,14 +337,14 @@ export class ExcelFormulaParser {
 
     for (let i = 0; i < formula.length; i++) {
       const char = formula[i];
-      const prevChar = i > 0 ? formula[i - 1] : '';
+      const prevChar = i > 0 ? formula[i - 1] : "";
 
       // Handle quotes (ignore escaped quotes)
-      if (char === "'" && prevChar !== '\\') {
+      if (char === "'" && prevChar !== "\\") {
         inSingleQuote = !inSingleQuote;
         continue;
       }
-      if (char === '"' && prevChar !== '\\') {
+      if (char === '"' && prevChar !== "\\") {
         inDoubleQuote = !inDoubleQuote;
         continue;
       }
@@ -345,9 +354,9 @@ export class ExcelFormulaParser {
         continue;
       }
 
-      if (char === '(') {
+      if (char === "(") {
         parenCount++;
-      } else if (char === ')') {
+      } else if (char === ")") {
         parenCount--;
         if (parenCount < 0) {
           throw new Error("Unexpected closing parenthesis ')'");
@@ -365,14 +374,14 @@ export class ExcelFormulaParser {
 
     // Check for unmatched parentheses
     if (parenCount > 0) {
-      throw new Error(`Missing ${parenCount} closing parenthesis${parenCount > 1 ? 'es' : ''} ')'`);
+      throw new Error(`Missing ${parenCount} closing parenthesis${parenCount > 1 ? "es" : ""} ')'`);
     }
 
     // Check for trailing operators
     const trimmed = formula.trim();
     if (trimmed.length > 0) {
       const lastChar = trimmed[trimmed.length - 1];
-      if (['+', '-', '*', '/', '=', '<', '>', '&'].includes(lastChar)) {
+      if (["+", "-", "*", "/", "=", "<", ">", "&"].includes(lastChar)) {
         throw new Error(`Formula cannot end with operator '${lastChar}'`);
       }
     }
@@ -382,7 +391,7 @@ export class ExcelFormulaParser {
     if (emptyParenPattern.test(formula)) {
       const match = formula.match(/([A-Z][A-Z0-9_]*)\(\s*\)/gi);
       if (match) {
-        throw new Error(`Function ${match[0].replace('()', '')} has empty parentheses`);
+        throw new Error(`Function ${match[0].replace("()", "")} has empty parentheses`);
       }
     }
   }

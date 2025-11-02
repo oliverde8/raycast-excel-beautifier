@@ -8,7 +8,7 @@ import {
   CellReferenceExpression,
   CellRangeExpression,
   FormattingOptions,
-  DEFAULT_FORMATTING_OPTIONS
+  DEFAULT_FORMATTING_OPTIONS,
 } from "./types";
 
 export class ExcelRawTextFormatter {
@@ -77,9 +77,7 @@ export class ExcelRawTextFormatter {
         } else if (param instanceof SubExpression) {
           result += this.formatSubExpression(param, depth);
         } else {
-          const paramContent = param.getChilds().length === 0 
-            ? param.original || ""
-            : this.prettyPrint(param, depth);
+          const paramContent = param.getChilds().length === 0 ? param.original || "" : this.prettyPrint(param, depth);
           result += paramContent || "";
         }
 
@@ -113,9 +111,7 @@ export class ExcelRawTextFormatter {
         result += subResult;
       } else {
         // For parameter content, preserve original or format children
-        const paramContent = param.getChilds().length === 0
-          ? param.original || ""
-          : this.prettyPrint(param, depth + 1);
+        const paramContent = param.getChilds().length === 0 ? param.original || "" : this.prettyPrint(param, depth + 1);
         result += paramContent || "";
       }
 
@@ -175,21 +171,15 @@ export class ExcelRawTextFormatter {
     const content = this.prettyPrint(subExpr, depth);
 
     // If it's simple, keep on one line
-    if (!content.includes('\n') && content.length < 50 && !this.containsFunction(subExpr)) {
+    if (!content.includes("\n") && content.length < 50 && !this.containsFunction(subExpr)) {
       return "(" + content + ")";
     }
 
     // Complex sub-expression gets multi-line formatting
-    return "(\n" +
-      this.indent(depth + 1) + content + "\n" +
-      this.indent(depth) + ")";
+    return "(\n" + this.indent(depth + 1) + content + "\n" + this.indent(depth) + ")";
   }
 
-  private formatOperator(
-    operator: OperatorExpression,
-    index: number,
-    siblings: ExcelExpression[]
-  ): string {
+  private formatOperator(operator: OperatorExpression, index: number, siblings: ExcelExpression[]): string {
     if (!this.options.useOperatorSpacing) {
       return operator.operator;
     }
@@ -260,7 +250,7 @@ export class ExcelRawTextFormatter {
     if (expr instanceof FormulaExpr) {
       return true;
     }
-    return expr.getChilds().some(child => this.containsFunction(child));
+    return expr.getChilds().some((child) => this.containsFunction(child));
   }
 
   private needsSpacing(current: ExcelExpression, next: ExcelExpression): boolean {

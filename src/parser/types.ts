@@ -47,11 +47,11 @@ export class OperatorExpression extends ExcelExpression {
 }
 
 export class CellReferenceExpression extends ExcelExpression {
-  readonly sheet?: string;         // Sheet name (e.g., "Sheet1" in "Sheet1!A1")
-  readonly column: string;         // Column letter(s) (e.g., "A", "AB")
-  readonly row: string;            // Row number (e.g., "1", "100")
-  readonly isColumnAbsolute: boolean;  // True if column has $ (e.g., "$A1")
-  readonly isRowAbsolute: boolean;     // True if row has $ (e.g., "A$1")
+  readonly sheet?: string; // Sheet name (e.g., "Sheet1" in "Sheet1!A1")
+  readonly column: string; // Column letter(s) (e.g., "A", "AB")
+  readonly row: string; // Row number (e.g., "1", "100")
+  readonly isColumnAbsolute: boolean; // True if column has $ (e.g., "$A1")
+  readonly isRowAbsolute: boolean; // True if row has $ (e.g., "A$1")
 
   constructor(
     original: string,
@@ -59,7 +59,7 @@ export class CellReferenceExpression extends ExcelExpression {
     column: string,
     row: string,
     isColumnAbsolute: boolean,
-    isRowAbsolute: boolean
+    isRowAbsolute: boolean,
   ) {
     super(original);
     this.sheet = sheet;
@@ -70,15 +70,15 @@ export class CellReferenceExpression extends ExcelExpression {
   }
 
   getFullReference(): string {
-    const sheetPrefix = this.sheet ? `${this.sheet}!` : '';
-    const colPrefix = this.isColumnAbsolute ? '$' : '';
-    const rowPrefix = this.isRowAbsolute ? '$' : '';
+    const sheetPrefix = this.sheet ? `${this.sheet}!` : "";
+    const colPrefix = this.isColumnAbsolute ? "$" : "";
+    const rowPrefix = this.isRowAbsolute ? "$" : "";
     return `${sheetPrefix}${colPrefix}${this.column}${rowPrefix}${this.row}`;
   }
 }
 
 export class CellRangeExpression extends ExcelExpression {
-  readonly sheet?: string;         // Sheet name if specified
+  readonly sheet?: string; // Sheet name if specified
   readonly startCell: CellReferenceExpression;
   readonly endCell: CellReferenceExpression;
 
@@ -86,7 +86,7 @@ export class CellRangeExpression extends ExcelExpression {
     original: string,
     sheet: string | undefined,
     startCell: CellReferenceExpression,
-    endCell: CellReferenceExpression
+    endCell: CellReferenceExpression,
   ) {
     super(original);
     this.sheet = sheet;
@@ -95,8 +95,8 @@ export class CellRangeExpression extends ExcelExpression {
   }
 
   getFullReference(): string {
-    const sheetPrefix = this.sheet ? `${this.sheet}!` : '';
-    return `${sheetPrefix}${this.startCell.getFullReference().replace(/^.*!/, '')}:${this.endCell.getFullReference().replace(/^.*!/, '')}`;
+    const sheetPrefix = this.sheet ? `${this.sheet}!` : "";
+    return `${sheetPrefix}${this.startCell.getFullReference().replace(/^.*!/, "")}:${this.endCell.getFullReference().replace(/^.*!/, "")}`;
   }
 }
 
