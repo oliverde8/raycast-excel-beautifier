@@ -4,6 +4,7 @@ import {
   ExcelExpression,
   SubExpression,
   FormulaExpr,
+  OperatorExpression,
   FormattingOptions,
   DEFAULT_FORMATTING_OPTIONS
 } from "./types";
@@ -23,11 +24,9 @@ export class ExcelRawTextFormatter {
   private prettyPrint(expression: ExcelExpression, depth: number): string {
     const children = expression.getChilds();
 
-    // If no children, return the original content with operator spacing
+    // If no children, return the original content
     if (children.length === 0) {
-      return this.options.useOperatorSpacing 
-        ? this.addOperatorSpacing(expression.original || "")
-        : expression.original || "";
+      return expression.original || "";
     }
 
     let result = "";
@@ -39,23 +38,14 @@ export class ExcelRawTextFormatter {
         result += this.formatFunction(child, depth);
       } else if (child instanceof SubExpression) {
         result += this.formatSubExpression(child, depth);
+      } else if (child instanceof OperatorExpression) {
+        result += this.formatOperator(child, i, children);
       } else {
         // For regular expressions, check if they have children or use original
         if (child.getChilds().length === 0) {
-          const content = this.options.useOperatorSpacing 
-            ? this.addOperatorSpacing(child.original || "")
-            : child.original || "";
-          result += content;
+          result += child.original || "";
         } else {
           result += this.prettyPrint(child, depth);
-        }
-      }
-
-      // Add spacing between elements if needed
-      if (i < children.length - 1) {
-        const nextChild = children[i + 1];
-        if (this.needsSpacing(child, nextChild)) {
-          result += " ";
         }
       }
     }
@@ -82,7 +72,7 @@ export class ExcelRawTextFormatter {
           result += this.formatSubExpression(param, depth);
         } else {
           const paramContent = param.getChilds().length === 0 
-            ? (this.options.useOperatorSpacing ? this.addOperatorSpacing(param.original || "") : param.original || "")
+            ? param.original || ""
             : this.prettyPrint(param, depth);
           result += paramContent || "";
         }
@@ -118,7 +108,7 @@ export class ExcelRawTextFormatter {
       } else {
         // For parameter content, preserve original or format children
         const paramContent = param.getChilds().length === 0 
-          ? (this.options.useOperatorSpacing ? this.addOperatorSpacing(param.original || "") : param.original || "")
+          ? param.original || ""
           : this.prettyPrint(param, depth + 1);
         result += paramContent || "";
       }
@@ -189,6 +179,67 @@ export class ExcelRawTextFormatter {
       this.indent(depth) + ")";
   }
 
+  private formatOperator(
+    operator: OperatorExpression, 
+    index: number, 
+    siblings: ExcelExpression[]
+  ): string {
+    if (!this.options.useOperatorSpacing) {
+      return operator.operator;
+    }
+
+    const op = operator.operator;
+    let result = "";
+
+    // Add space before operator (except for certain cases)
+    const prevSibling = index > 0 ? siblings[index - 1] : null;
+
+    const shouldSpaceBefore = this.shouldSpaceBeforeOperator(op, prevSibling);
+    const shouldSpaceAfter = this.shouldSpaceAfterOperator(op);
+
+    if (shouldSpaceBefore) {
+      result += " ";
+    }
+    
+    result += op;
+    
+    if (shouldSpaceAfter) {
+      result += " ";
+    }
+
+    return result;
+  }
+
+  private shouldSpaceBeforeOperator(operator: string, prevSibling: ExcelExpression | null): boolean {
+    // Don't space before minus if it's at start or likely a negative number
+    if (operator === "-") {
+      if (!prevSibling) return false; // Beginning of expression
+      if (prevSibling instanceof OperatorExpression) {
+        const prevOp = prevSibling.operator;
+        // After another operator, likely unary minus
+        if (["+", "-", "*", "/", "^", "=", "<", ">", "<=", ">=", "<>", "!=", "==", "("].includes(prevOp)) {
+          return false;
+        }
+      }
+    }
+    
+    // Don't space around colon in ranges (A1:B10)
+    if (operator === ":") {
+      return false;
+    }
+
+    return true;
+  }
+
+  private shouldSpaceAfterOperator(operator: string): boolean {
+    // Don't space around colon in ranges (A1:B10)
+    if (operator === ":") {
+      return false;
+    }
+
+    return true;
+  }
+
   private containsFunction(expr: ExcelExpression): boolean {
     if (expr instanceof FormulaExpr) {
       return true;
@@ -197,13 +248,17 @@ export class ExcelRawTextFormatter {
   }
 
   private needsSpacing(current: ExcelExpression, next: ExcelExpression): boolean {
-    const currentText = current.original?.trim();
-    const nextText = next.original?.trim();
+    // Since operators are now handled separately as OperatorExpression,
+    // we mainly need spacing between functions and regular expressions
+    if (current instanceof FormulaExpr || next instanceof FormulaExpr) {
+      return false; // Functions handle their own spacing
+    }
+    
+    if (current instanceof OperatorExpression || next instanceof OperatorExpression) {
+      return false; // Operators handle their own spacing
+    }
 
-    if (!currentText || !nextText) return false;
-
-    const operators = ['+', '-', '*', '/', '=', '<', '>', '<=', '>=', '<>', '&'];
-    return operators.includes(currentText) || operators.includes(nextText);
+    return false; // Let operators handle all spacing needs
   }
 
   private indent(depth: number): string {
@@ -224,49 +279,5 @@ export class ExcelRawTextFormatter {
     }
   }
 
-  private addOperatorSpacing(text: string): string {
-    if (!text) return text;
 
-    // Add spacing around mathematical and comparison operators
-    let result = text;
-
-    // Define operators that need spacing
-    const operators = [
-      { op: '<=', replacement: ' <= ' },
-      { op: '>=', replacement: ' >= ' },
-      { op: '<>', replacement: ' <> ' },
-      { op: '!=', replacement: ' != ' },
-      { op: '==', replacement: ' == ' },
-      { op: '=', replacement: ' = ' },
-      { op: '<', replacement: ' < ' },
-      { op: '>', replacement: ' > ' },
-      { op: '+', replacement: ' + ' },
-      { op: '-', replacement: ' - ' },
-      { op: '*', replacement: ' * ' },
-      { op: '/', replacement: ' / ' },
-      { op: '&', replacement: ' & ' },
-    ];
-
-    for (const { op, replacement } of operators) {
-      // Use regex to avoid spacing already spaced operators and operators in strings
-      const regex = new RegExp(`(?<![\\s<>=!])\\${op.split('').join('\\')}(?![\\s<>=!])`, 'g');
-      result = result.replace(regex, replacement);
-    }
-
-    // Clean up multiple spaces
-    result = result.replace(/\s{2,}/g, ' ');
-
-    // Handle special cases - don't add space around operators in certain contexts
-    // Fix negative numbers (don't space before minus if it's at start or after operator/comma/parenthesis)
-    result = result.replace(/(^|[+\-*/=<>!&,(])\s*-\s*(\d)/g, '$1-$2');
-
-    // Fix cell ranges (A1:B10 should not have spaces around colon)
-    result = result.replace(/([A-Z]+\$?\d+)\s*:\s*([A-Z]+\$?\d+)/g, '$1:$2');
-
-    // Fix absolute references (don't space around $ in cell references)
-    result = result.replace(/\$\s*([A-Z]+)\s*\$?\s*(\d+)/g, '$$1$$2');
-    result = result.replace(/([A-Z]+)\s*\$\s*(\d+)/g, '$1$$2');
-
-    return result.trim();
-  }
 }

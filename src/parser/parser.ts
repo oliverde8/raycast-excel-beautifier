@@ -1,10 +1,34 @@
 // Excel Formula Parser - Pure parsing logic
 
 import { FormulaTypes } from "./formula-types";
-import { ExcelExpression, SubExpression, FormulaExpr } from "./types";
+import { ExcelExpression, SubExpression, FormulaExpr, OperatorExpression } from "./types";
 
 export class ExcelFormulaParser {
   private static readonly formulaTypes: Array<string> = Object.values(FormulaTypes);
+  
+  // Define operators in order of precedence (longest first to avoid partial matches)
+  private static readonly operators: Array<string> = [
+    "<=", ">=", "<>", "!=", "==", // Comparison operators (2 chars)
+    "+", "-", "*", "/", "^", "&", "=", "<", ">", ":", // Single char operators
+  ];
+
+  private static findOperatorAt(input: string, position: number): string | null {
+    // Check for 2-character operators first
+    if (position < input.length - 1) {
+      const twoChar = input.substring(position, position + 2);
+      if (this.operators.includes(twoChar)) {
+        return twoChar;
+      }
+    }
+    
+    // Check for single-character operators
+    const oneChar = input.charAt(position);
+    if (this.operators.includes(oneChar)) {
+      return oneChar;
+    }
+    
+    return null;
+  }
 
   private static parseExpressions(
     parent: ExcelExpression,
@@ -16,42 +40,60 @@ export class ExcelFormulaParser {
     let i: number = startIndex;
 
     while (i < input.length) {
+      const operator = this.findOperatorAt(input, i);
+      
       if (input[i] === "(") {
-        if (token.length > 0) {
-          // End of expression
-          parent.addChild(new ExcelExpression(token));
-          token = "";
+        if (token.trim().length > 0) {
+          // Check if token is a function name
+          if (this.formulaTypes.includes(token.trim().toUpperCase())) {
+            i = this.parseFormula(
+              parent,
+              FormulaTypes[token.trim().toUpperCase() as keyof typeof FormulaTypes],
+              i,
+              input,
+              separator,
+            );
+            token = "";
+          } else {
+            // Regular token before parentheses
+            parent.addChild(new ExcelExpression(token.trim()));
+            token = "";
+            const expression = new SubExpression("");
+            parent.addChild(expression);
+            i = this.parseExpressions(expression, i + 1, input, separator);
+          }
+        } else {
+          // Parentheses without preceding token
+          const expression = new SubExpression("");
+          parent.addChild(expression);
+          i = this.parseExpressions(expression, i + 1, input, separator);
         }
-        const expression = new SubExpression("");
-        parent.addChild(expression);
-        i = this.parseExpressions(expression, i + 1, input, separator);
       } else if (input[i] === ")") {
-        if (token.length > 0) {
-          // End of expression
-          parent.addChild(new ExcelExpression(token));
+        if (token.trim().length > 0) {
+          parent.addChild(new ExcelExpression(token.trim()));
         }
         return i;
-      } else {
-        token += input[i];
-        if (this.formulaTypes.includes(token.toUpperCase())) {
-          // Parse formula and jump to next expression
-          i = this.parseFormula(
-            parent,
-            FormulaTypes[token.toUpperCase() as keyof typeof FormulaTypes],
-            i + 1,
-            input,
-            separator,
-          );
-          // Token consumed
+      } else if (operator) {
+        // Found an operator
+        if (token.trim().length > 0) {
+          parent.addChild(new ExcelExpression(token.trim()));
           token = "";
         }
+        parent.addChild(new OperatorExpression(operator));
+        i += operator.length - 1; // Skip the operator characters (-1 because i++ will happen)
+      } else if (input[i] === " " || input[i] === "\t" || input[i] === "\n") {
+        // Handle whitespace - just add to token for now, we'll trim later
+        token += input[i];
+      } else {
+        // Regular character
+        token += input[i];
       }
 
       i++;
     }
 
-    if (token.length > 0) {
-      parent.addChild(new ExcelExpression(token));
+    if (token.trim().length > 0) {
+      parent.addChild(new ExcelExpression(token.trim()));
     }
 
     return i;
@@ -74,13 +116,13 @@ export class ExcelFormulaParser {
     while (i < input.length) {
       if (input[i] === separator && braceCount === 0) {
         if (token.trim().length > 0) {
-          const expression = new ExcelExpression(token.trim());
-          this.parseExpressions(expression, 0, token.trim(), separator);
+          const paramExpression = new ExcelExpression(token.trim());
+          this.parseExpressions(paramExpression, 0, token.trim(), separator);
 
-          if (expression.getChilds().length === 1) {
-            formulaExpr.addChild(expression.getChilds()[0]);
-          } else if (expression.getChilds().length > 1) {
-            formulaExpr.addChild(expression);
+          if (paramExpression.getChilds().length === 1) {
+            formulaExpr.addChild(paramExpression.getChilds()[0]);
+          } else if (paramExpression.getChilds().length > 1) {
+            formulaExpr.addChild(paramExpression);
           } else {
             // No children found, add the original token as a simple expression
             formulaExpr.addChild(new ExcelExpression(token.trim()));
@@ -95,14 +137,15 @@ export class ExcelFormulaParser {
         }
 
         if (braceCount < 0) {
+          // End of function parameters
           if (token.trim().length > 0) {
-            const expression = new ExcelExpression(token.trim());
-            this.parseExpressions(expression, 0, token.trim(), separator);
+            const paramExpression = new ExcelExpression(token.trim());
+            this.parseExpressions(paramExpression, 0, token.trim(), separator);
 
-            if (expression.getChilds().length === 1) {
-              formulaExpr.addChild(expression.getChilds()[0]);
-            } else if (expression.getChilds().length > 1) {
-              formulaExpr.addChild(expression);
+            if (paramExpression.getChilds().length === 1) {
+              formulaExpr.addChild(paramExpression.getChilds()[0]);
+            } else if (paramExpression.getChilds().length > 1) {
+              formulaExpr.addChild(paramExpression);
             } else {
               // No children found, add the original token as a simple expression
               formulaExpr.addChild(new ExcelExpression(token.trim()));

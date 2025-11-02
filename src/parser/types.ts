@@ -32,6 +32,15 @@ export class FormulaExpr extends ExcelExpression {
 
 export class SimpleExpression extends ExcelExpression {}
 
+export class OperatorExpression extends ExcelExpression {
+  readonly operator: string;
+
+  constructor(operator: string) {
+    super(operator);
+    this.operator = operator;
+  }
+}
+
 export interface FormattingOptions {
   useNestingIndicators?: boolean;
   useOperatorSpacing?: boolean;
