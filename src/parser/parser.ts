@@ -19,7 +19,7 @@ export class ExcelFormulaParser {
     ">=",
     "<>",
     "!=",
-    "==", // Comparison operators (2 chars)
+    "==",
     "+",
     "-",
     "*",
@@ -29,7 +29,6 @@ export class ExcelFormulaParser {
     "=",
     "<",
     ">",
-    ":", // Single char operators
   ];
 
   private static findOperatorAt(input: string, position: number): string | null {
@@ -54,38 +53,13 @@ export class ExcelFormulaParser {
     // Remove any leading/trailing whitespace
     text = text.trim();
 
-    // Check for range first (contains :)
+    // Check for range (contains :)
     if (text.includes(":")) {
       return this.parseCellRange(text);
     }
 
     // Parse single cell reference
     return this.parseSingleCellReference(text);
-  }
-
-  private static parseSingleCellReference(text: string): CellReferenceExpression | null {
-    // Pattern for cell reference: [Sheet!][$]Column[$]Row
-    // Examples: A1, $A1, A$1, $A$1, Sheet1!A1, 'Sheet Name'!$A$1
-    const cellPattern = /^(?:([^!]+)!)?(\$?)([A-Z]+)(\$?)(\d+)$/i;
-    const match = text.match(cellPattern);
-
-    if (!match) {
-      return null;
-    }
-
-    const [, sheet, colAbsolute, column, rowAbsolute, row] = match;
-
-    // Clean sheet name (remove quotes if present)
-    const cleanSheet = sheet ? sheet.replace(/^'|'$/g, "") : undefined;
-
-    return new CellReferenceExpression(
-      text,
-      cleanSheet,
-      column.toUpperCase(),
-      row,
-      colAbsolute === "$",
-      rowAbsolute === "$",
-    );
   }
 
   private static parseCellRange(text: string): CellRangeExpression | null {
@@ -118,41 +92,32 @@ export class ExcelFormulaParser {
     return new CellRangeExpression(text, sheet, startCell, endCell);
   }
 
-  private static combineCellRanges(parent: ExcelExpression): void {
-    const children = parent.getChilds();
-    const newChildren: ExcelExpression[] = [];
+  private static parseSingleCellReference(text: string): CellReferenceExpression | null {
+    // Pattern for cell reference: [Sheet!][$]Column[$]Row
+    // Examples: A1, $A1, A$1, $A$1, Sheet1!A1, 'Sheet Name'!$A$1
+    const cellPattern = /^(?:([^!]+)!)?(\$?)([A-Z]+)(\$?)(\d+)$/i;
+    const match = text.match(cellPattern);
 
-    for (let i = 0; i < children.length; i++) {
-      const current = children[i];
-      const next = i + 1 < children.length ? children[i + 1] : null;
-      const afterNext = i + 2 < children.length ? children[i + 2] : null;
-
-      // Check if we have: CellReference : CellReference pattern
-      if (
-        current instanceof CellReferenceExpression &&
-        next instanceof OperatorExpression &&
-        next.operator === ":" &&
-        afterNext instanceof CellReferenceExpression
-      ) {
-        // Create a range expression
-        const sheet = current.sheet || afterNext.sheet;
-        const rangeText = `${current.getFullReference()}:${afterNext.getFullReference()}`;
-        const range = new CellRangeExpression(rangeText, sheet, current, afterNext);
-
-        newChildren.push(range);
-        i += 2; // Skip the next two elements (: and end cell)
-      } else {
-        newChildren.push(current);
-        // Recursively process children
-        if (current.getChilds().length > 0) {
-          this.combineCellRanges(current);
-        }
-      }
+    if (!match) {
+      return null;
     }
 
-    // Replace the children with the new combined list
-    parent.replaceChildren(newChildren);
+    const [, sheet, colAbsolute, column, rowAbsolute, row] = match;
+
+    // Clean sheet name (remove quotes if present)
+    const cleanSheet = sheet ? sheet.replace(/^'|'$/g, "") : undefined;
+
+    return new CellReferenceExpression(
+      text,
+      cleanSheet,
+      column.toUpperCase(),
+      row,
+      colAbsolute === "$",
+      rowAbsolute === "$",
+    );
   }
+
+
 
   private static parseExpressions(
     parent: ExcelExpression,
@@ -162,11 +127,30 @@ export class ExcelFormulaParser {
   ): number {
     let token = "";
     let i: number = startIndex;
+    let inDoubleQuote = false;
 
     while (i < input.length) {
+      const char = input[i];
+      const prevChar = i > 0 ? input[i - 1] : "";
+
+      // Handle quotes
+      if (char === '"' && prevChar !== "\\") {
+        inDoubleQuote = !inDoubleQuote;
+        token += char;
+        i++;
+        continue;
+      }
+
+      // Skip operator/special char detection inside quotes
+      if (inDoubleQuote) {
+        token += char;
+        i++;
+        continue;
+      }
+
       const operator = this.findOperatorAt(input, i);
 
-      if (input[i] === "(") {
+      if (char === "(") {
         if (token.trim().length > 0) {
           // Check if token is a function name
           if (this.formulaTypes.includes(token.trim().toUpperCase())) {
@@ -180,7 +164,6 @@ export class ExcelFormulaParser {
             token = "";
           } else {
             // Regular token before parentheses
-            // Try to parse as cell reference first
             const cellRef = this.parseCellReference(token.trim());
             if (cellRef) {
               parent.addChild(cellRef);
@@ -198,9 +181,8 @@ export class ExcelFormulaParser {
           parent.addChild(expression);
           i = this.parseExpressions(expression, i + 1, input, separator);
         }
-      } else if (input[i] === ")") {
+      } else if (char === ")") {
         if (token.trim().length > 0) {
-          // Try to parse as cell reference first
           const cellRef = this.parseCellReference(token.trim());
           if (cellRef) {
             parent.addChild(cellRef);
@@ -212,7 +194,6 @@ export class ExcelFormulaParser {
       } else if (operator) {
         // Found an operator
         if (token.trim().length > 0) {
-          // Try to parse as cell reference first
           const cellRef = this.parseCellReference(token.trim());
           if (cellRef) {
             parent.addChild(cellRef);
@@ -223,19 +204,16 @@ export class ExcelFormulaParser {
         }
         parent.addChild(new OperatorExpression(operator));
         i += operator.length - 1; // Skip the operator characters (-1 because i++ will happen)
-      } else if (input[i] === " " || input[i] === "\t" || input[i] === "\n") {
-        // Handle whitespace - just add to token for now, we'll trim later
-        token += input[i];
+      } else if (char === " " || char === "\t" || char === "\n") {
+        token += char;
       } else {
-        // Regular character
-        token += input[i];
+        token += char;
       }
 
       i++;
     }
 
     if (token.trim().length > 0) {
-      // Try to parse as cell reference first
       const cellRef = this.parseCellReference(token.trim());
       if (cellRef) {
         parent.addChild(cellRef);
@@ -265,7 +243,7 @@ export class ExcelFormulaParser {
       if (input[i] === separator && braceCount === 0) {
         if (token.trim().length > 0) {
           const paramExpression = new ExcelExpression(token.trim());
-          this.parseExpressions(paramExpression, 0, token.trim(), separator);
+          this.parseExpressions(paramExpression, 0, token, separator);
 
           if (paramExpression.getChilds().length === 1) {
             formulaExpr.addChild(paramExpression.getChilds()[0]);
@@ -293,7 +271,7 @@ export class ExcelFormulaParser {
           // End of function parameters
           if (token.trim().length > 0) {
             const paramExpression = new ExcelExpression(token.trim());
-            this.parseExpressions(paramExpression, 0, token.trim(), separator);
+            this.parseExpressions(paramExpression, 0, token, separator);
 
             if (paramExpression.getChilds().length === 1) {
               formulaExpr.addChild(paramExpression.getChilds()[0]);
@@ -412,7 +390,7 @@ export class ExcelFormulaParser {
     try {
       const baseExpression = new ExcelExpression(cleanFormula);
       this.parseExpressions(baseExpression, 0, cleanFormula, separator);
-      this.combineCellRanges(baseExpression);
+      console.log(JSON.stringify(baseExpression));
 
       return baseExpression;
     } catch (error) {
