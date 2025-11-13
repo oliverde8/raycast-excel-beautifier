@@ -12,6 +12,12 @@ import {
 
 export class ExcelFormulaParser {
   private static readonly formulaTypes: Array<string> = Object.values(FormulaTypes);
+  private static readonly formulaTypesMap: Record<string, FormulaTypes> = {
+    ...Object.entries(FormulaTypes).reduce((acc, [, value]) => {
+      acc[value] = value as FormulaTypes;
+      return acc;
+    }, {} as Record<string, FormulaTypes>),
+  };
 
   // Define operators in order of precedence (longest first to avoid partial matches)
   private static readonly operators: Array<string> = [
@@ -153,15 +159,19 @@ export class ExcelFormulaParser {
       if (char === "(") {
         if (token.trim().length > 0) {
           // Check if token is a function name
-          if (this.formulaTypes.includes(token.trim().toUpperCase())) {
-            i = this.parseFormula(
-              parent,
-              FormulaTypes[token.trim().toUpperCase() as keyof typeof FormulaTypes],
-              i,
-              input,
-              separator,
-            );
-            token = "";
+          const upperToken = token.trim().toUpperCase();
+          if (this.formulaTypes.includes(upperToken)) {
+            const formulaType = this.formulaTypesMap[upperToken];
+            if (formulaType) {
+              i = this.parseFormula(
+                parent,
+                formulaType,
+                i,
+                input,
+                separator,
+              );
+              token = "";
+            }
           } else {
             // Regular token before parentheses
             const cellRef = this.parseCellReference(token.trim());

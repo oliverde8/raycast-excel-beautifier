@@ -37,12 +37,12 @@ export default function Command() {
           // Use our custom formatter with the new parser
           const result = ExcelFormulaBeautifier.rawText(trimmed);
           setBeautified(result);
-          
+
           // Extract formulas used in the expression
           const parsed = ExcelFormulaParser.parse(trimmed);
           const usedFormulas = extractFormulasFromExpression(parsed);
           setFormulas(usedFormulas);
-          
+
           showToast({
             style: Toast.Style.Success,
             title: "Success",
