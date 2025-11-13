@@ -104,37 +104,20 @@ ${beautified}
           key={`${formula.name}-desc`}
           title={formula.name}
           text={formula.doc?.description || "No documentation available"}
-        />
+        />,
       );
       if (formula.doc) {
         elements.push(
           <Detail.Metadata.TagList key={`${formula.name}-cat`} title="Category">
-            <Detail.Metadata.TagList.Item
-              text={formula.doc.category}
-              color={getCategoryColor(formula.doc.category)}
-            />
-          </Detail.Metadata.TagList>
+            <Detail.Metadata.TagList.Item text={formula.doc.category} color={getCategoryColor(formula.doc.category)} />
+          </Detail.Metadata.TagList>,
         );
-        elements.push(
-          <Detail.Metadata.Label
-            key={`${formula.name}-syn`}
-            title="Syntax"
-            text={formula.doc.syntax}
-          />
-        );
-        elements.push(
-          <Detail.Metadata.Label
-            key={`${formula.name}-ex`}
-            title="Example"
-            text={formula.doc.example}
-          />
-        );
-        elements.push(
-          <Detail.Metadata.Separator key={`${formula.name}-sep`} />
-        );
+        elements.push(<Detail.Metadata.Label key={`${formula.name}-syn`} title="Syntax" text={formula.doc.syntax} />);
+        elements.push(<Detail.Metadata.Label key={`${formula.name}-ex`} title="Example" text={formula.doc.example} />);
+        elements.push(<Detail.Metadata.Separator key={`${formula.name}-sep`} />);
       }
     });
-    
+
     return elements;
   };
 

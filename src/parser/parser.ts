@@ -13,10 +13,13 @@ import {
 export class ExcelFormulaParser {
   private static readonly formulaTypes: Array<string> = Object.values(FormulaTypes);
   private static readonly formulaTypesMap: Record<string, FormulaTypes> = {
-    ...Object.entries(FormulaTypes).reduce((acc, [, value]) => {
-      acc[value] = value as FormulaTypes;
-      return acc;
-    }, {} as Record<string, FormulaTypes>),
+    ...Object.entries(FormulaTypes).reduce(
+      (acc, [, value]) => {
+        acc[value] = value as FormulaTypes;
+        return acc;
+      },
+      {} as Record<string, FormulaTypes>,
+    ),
   };
 
   // Define operators in order of precedence (longest first to avoid partial matches)
@@ -123,8 +126,6 @@ export class ExcelFormulaParser {
     );
   }
 
-
-
   private static parseExpressions(
     parent: ExcelExpression,
     startIndex: number,
@@ -163,13 +164,7 @@ export class ExcelFormulaParser {
           if (this.formulaTypes.includes(upperToken)) {
             const formulaType = this.formulaTypesMap[upperToken];
             if (formulaType) {
-              i = this.parseFormula(
-                parent,
-                formulaType,
-                i,
-                input,
-                separator,
-              );
+              i = this.parseFormula(parent, formulaType, i, input, separator);
               token = "";
             }
           } else {
